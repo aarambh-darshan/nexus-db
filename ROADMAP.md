@@ -39,8 +39,8 @@
 
 - [x] Auto-detect relations from schema
 - [x] Eager loading (Include/Preload)
-- [ ] Lazy loading with proxy
-- [ ] Cascade delete/update
+- [x] Lazy loading with proxy
+- [x] Cascade delete/update
 - [ ] Many-to-many with junction tables
 
 ---

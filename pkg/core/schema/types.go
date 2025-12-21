@@ -313,13 +313,41 @@ const (
 	RelationManyToMany
 )
 
+// CascadeAction defines what happens to related records on delete/update.
+type CascadeAction int
+
+const (
+	// NoAction does nothing to related records (default).
+	NoAction CascadeAction = iota
+	// Cascade deletes/updates related records.
+	Cascade
+	// SetNull sets the foreign key to NULL.
+	SetNull
+	// Restrict prevents the operation if related records exist.
+	Restrict
+)
+
 // Relation represents a relationship between models.
 type Relation struct {
-	Type         RelationType
-	TargetModel  string
-	ForeignKey   string
-	ReferenceKey string
-	Through      string // For many-to-many
+	Type           RelationType
+	TargetModel    string
+	ForeignKey     string
+	ReferenceKey   string
+	Through        string        // For many-to-many
+	OnDeleteAction CascadeAction // Action on parent delete
+	OnUpdateAction CascadeAction // Action on parent update
+}
+
+// OnDelete sets the cascade action for delete operations.
+func (r *Relation) OnDelete(action CascadeAction) *Relation {
+	r.OnDeleteAction = action
+	return r
+}
+
+// OnUpdate sets the cascade action for update operations.
+func (r *Relation) OnUpdate(action CascadeAction) *Relation {
+	r.OnUpdateAction = action
+	return r
 }
 
 // Validate validates the schema for correctness.

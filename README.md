@@ -216,6 +216,21 @@ for _, post := range results {
 // HasMany - load children for each parent
 users := query.NewWithSchema(conn, "users", s)
 results, _ = users.Select().Include("Post").All(ctx)
+
+// Lazy loading - defer queries until accessed
+lazyPosts, _ := posts.Select().AllLazy(ctx)
+for _, post := range lazyPosts {
+    // User is NOT loaded yet
+    user, _ := post.GetRelation(ctx, "User")  // Query happens here
+    if user != nil {
+        fmt.Printf("Post by %s\n", user.(*query.LazyResult).Get("name"))
+    }
+}
+
+// Cascade delete - automatically delete related records
+// Configure: rel.OnDelete(schema.Cascade) or schema.SetNull or schema.Restrict
+users := query.NewWithSchema(conn, "users", s)
+users.Delete().Where(query.Eq("id", 1)).Cascade().Exec(ctx)  // Deletes user AND posts
 ```
 
 ### Dialect Support

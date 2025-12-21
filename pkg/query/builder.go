@@ -68,6 +68,7 @@ func (b *Builder) Delete() *DeleteBuilder {
 	return &DeleteBuilder{
 		conn:      b.conn,
 		tableName: b.tableName,
+		schema:    b.schema,
 	}
 }
 

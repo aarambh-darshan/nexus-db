@@ -207,6 +207,44 @@ func (s *SelectBuilder) One(ctx context.Context) (Result, error) {
 	return results[0], nil
 }
 
+// AllLazy executes the query and returns LazyResults with deferred relation loading.
+// Unlike Include() which eagerly loads relations, lazy loading defers queries
+// until GetRelation() is called on each result.
+func (s *SelectBuilder) AllLazy(ctx context.Context) (LazyResults, error) {
+	query, args := s.Build()
+	rows, err := s.conn.Query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	results, err := scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wrap each result in LazyResult
+	lazyResults := make(LazyResults, len(results))
+	for i, r := range results {
+		lazyResults[i] = NewLazyResult(r, s.conn, s.schema, s.tableName)
+	}
+
+	return lazyResults, nil
+}
+
+// OneLazy executes the query and returns a single LazyResult.
+func (s *SelectBuilder) OneLazy(ctx context.Context) (*LazyResult, error) {
+	s.limit = 1
+	results, err := s.AllLazy(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(results) == 0 {
+		return nil, nil
+	}
+	return results[0], nil
+}
+
 // Count returns the count of matching rows.
 func (s *SelectBuilder) Count(ctx context.Context) (int64, error) {
 	// Build count query
