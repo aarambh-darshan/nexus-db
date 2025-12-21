@@ -37,7 +37,7 @@
 
 ## 🔮 v0.3.0 - Relations & Eager Loading
 
-- [ ] Auto-detect relations from schema
+- [x] Auto-detect relations from schema
 - [ ] Eager loading (Include/Preload)
 - [ ] Lazy loading with proxy
 - [ ] Cascade delete/update

@@ -221,6 +221,10 @@ type Field struct {
 	Scale         int
 	DefaultValue  interface{}
 	DefaultExpr   string // For expressions like NOW()
+
+	// Relation detection
+	References  string // Target model name (e.g., "User")
+	IsReference bool   // True if this is a foreign key field
 }
 
 // PrimaryKey marks this field as the primary key.
@@ -281,6 +285,14 @@ func (f *Field) Size(length int) *Field {
 func (f *Field) Prec(precision, scale int) *Field {
 	f.Precision = precision
 	f.Scale = scale
+	return f
+}
+
+// Ref explicitly marks this field as referencing another model.
+// This overrides auto-detection for cases where naming conventions don't apply.
+func (f *Field) Ref(modelName string) *Field {
+	f.References = modelName
+	f.IsReference = true
 	return f
 }
 

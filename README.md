@@ -175,6 +175,36 @@ cache := query.NewStmtCacheWithStats(db, 100)
 logger := query.NewLogger(os.Stdout, query.LogDebug)
 ```
 
+### v0.3.0 Features
+
+```go
+// Auto-detect relations from schema
+s := schema.NewSchema()
+
+s.Model("User", func(m *schema.Model) {
+    m.Int("id").PrimaryKey().AutoInc()
+    m.String("name")
+})
+
+s.Model("Post", func(m *schema.Model) {
+    m.Int("id").PrimaryKey().AutoInc()
+    m.String("title")
+    m.Int("user_id")  // Auto-detected → User
+})
+
+// Detect relations based on naming conventions
+s.DetectRelations()
+
+// Query relations
+post := s.Models["Post"]
+for _, rel := range post.GetBelongsTo() {
+    fmt.Printf("Post belongs to %s via %s\n", rel.TargetModel, rel.ForeignKey)
+}
+
+// Explicit references (when conventions don't apply)
+m.Int("author").Ref("User")
+```
+
 ### Dialect Support
 
 | Feature | PostgreSQL | SQLite | MySQL |
