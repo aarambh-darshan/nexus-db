@@ -1,6 +1,6 @@
 # Nexus-DB Roadmap
 
-## Current Version: 0.1.0 (Alpha)
+## Current Version: 0.2.0 (Alpha)
 
 ### ✅ Completed
 
@@ -24,14 +24,14 @@
 
 ---
 
-## 🚧 v0.2.0 - Query Enhancements
+## ✅ v0.2.0 - Query Enhancements
 
-- [ ] Raw SQL queries with parameter binding
-- [ ] Subquery support
-- [ ] UNION/INTERSECT/EXCEPT
-- [ ] Common Table Expressions (CTEs)
-- [ ] Prepared statements caching
-- [ ] Query logging with timing
+- [x] Raw SQL queries with parameter binding
+- [x] Subquery support (WhereIn, WhereExists, derived tables)
+- [x] UNION/INTERSECT/EXCEPT
+- [x] Common Table Expressions (CTEs)
+- [x] Prepared statements caching
+- [x] Query logging with timing
 
 ---
 

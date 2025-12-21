@@ -117,8 +117,8 @@ func IsNotNull(column string) Condition {
 	return Condition{Column: column, Operator: "IS NOT NULL", Value: nil}
 }
 
-// Raw creates a raw SQL condition.
-func Raw(sql string) Condition {
+// RawSQL creates a raw SQL condition for WHERE clauses.
+func RawSQL(sql string) Condition {
 	return Condition{Raw: sql}
 }
 
@@ -174,6 +174,38 @@ func buildWhere(dialect dialects.Dialect, conditions []Condition, startIndex int
 				argIndex++
 			}
 			parts = append(parts, fmt.Sprintf("%s IN (%s)", quotedCol, strings.Join(placeholders, ", ")))
+		case "IN_SUBQUERY":
+			// Handle subquery IN
+			if subquery, ok := cond.Value.(*SelectBuilder); ok {
+				subSQL, subArgs := subquery.Build()
+				parts = append(parts, fmt.Sprintf("%s IN (%s)", quotedCol, subSQL))
+				args = append(args, subArgs...)
+				argIndex += len(subArgs)
+			}
+		case "NOT_IN_SUBQUERY":
+			// Handle subquery NOT IN
+			if subquery, ok := cond.Value.(*SelectBuilder); ok {
+				subSQL, subArgs := subquery.Build()
+				parts = append(parts, fmt.Sprintf("%s NOT IN (%s)", quotedCol, subSQL))
+				args = append(args, subArgs...)
+				argIndex += len(subArgs)
+			}
+		case "EXISTS":
+			// Handle EXISTS subquery
+			if subquery, ok := cond.Value.(*SelectBuilder); ok {
+				subSQL, subArgs := subquery.Build()
+				parts = append(parts, fmt.Sprintf("EXISTS (%s)", subSQL))
+				args = append(args, subArgs...)
+				argIndex += len(subArgs)
+			}
+		case "NOT_EXISTS":
+			// Handle NOT EXISTS subquery
+			if subquery, ok := cond.Value.(*SelectBuilder); ok {
+				subSQL, subArgs := subquery.Build()
+				parts = append(parts, fmt.Sprintf("NOT EXISTS (%s)", subSQL))
+				args = append(args, subArgs...)
+				argIndex += len(subArgs)
+			}
 		default:
 			parts = append(parts, fmt.Sprintf("%s %s %s", quotedCol, cond.Operator, dialect.Placeholder(argIndex)))
 			args = append(args, cond.Value)

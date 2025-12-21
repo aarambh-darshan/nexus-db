@@ -149,6 +149,32 @@ query.Transaction(ctx, conn, func(tx *dialects.Tx) error {
 })
 ```
 
+### v0.2.0 Features
+
+```go
+// Raw SQL
+query.NewRawQuery(conn, "SELECT * FROM users WHERE id = ?", 1).All(ctx)
+query.RawExec(ctx, conn, "UPDATE users SET active = ?", true)
+
+// Subqueries
+users.Select().WhereIn("id", 
+    orders.Select("user_id").Where(query.Gt("total", 100)))
+
+// UNION / INTERSECT / EXCEPT
+q1.Select("id", "name").Union(q2.Select("id", "name")).All(ctx)
+
+// Common Table Expressions (CTEs)
+query.With(conn, "active_users", 
+    users.Select().Where(query.Eq("active", true))).
+    Select("*").From("active_users").All(ctx)
+
+// Statement caching
+cache := query.NewStmtCacheWithStats(db, 100)
+
+// Query logging
+logger := query.NewLogger(os.Stdout, query.LogDebug)
+```
+
 ### Dialect Support
 
 | Feature | PostgreSQL | SQLite | MySQL |
