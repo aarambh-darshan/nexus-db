@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nexus-db/nexus/pkg/core/schema"
 	"github.com/nexus-db/nexus/pkg/dialects"
 )
 
@@ -20,6 +21,8 @@ type SelectBuilder struct {
 	joins      []joinClause
 	groupBy    []string
 	having     []Condition
+	schema     *schema.Schema // Optional schema for relation-aware queries
+	includes   []string       // Relations to eager load
 }
 
 type joinClause struct {
@@ -79,6 +82,19 @@ func (s *SelectBuilder) GroupBy(columns ...string) *SelectBuilder {
 // Having adds a HAVING condition.
 func (s *SelectBuilder) Having(conditions ...Condition) *SelectBuilder {
 	s.having = append(s.having, conditions...)
+	return s
+}
+
+// WithSchema attaches a schema for relation-aware operations like eager loading.
+func (s *SelectBuilder) WithSchema(sch *schema.Schema) *SelectBuilder {
+	s.schema = sch
+	return s
+}
+
+// Include specifies relations to eager load.
+// Example: users.Select().WithSchema(s).Include("Posts", "Profile").All(ctx)
+func (s *SelectBuilder) Include(relations ...string) *SelectBuilder {
+	s.includes = append(s.includes, relations...)
 	return s
 }
 
@@ -164,7 +180,18 @@ func (s *SelectBuilder) All(ctx context.Context) (Results, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	return scanRows(rows)
+
+	results, err := scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	// Eager load related data if includes are specified
+	if err := s.preloadRelations(ctx, results); err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
 
 // One executes the query and returns the first matching row.

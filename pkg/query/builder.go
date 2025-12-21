@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/nexus-db/nexus/pkg/core/schema"
 	"github.com/nexus-db/nexus/pkg/dialects"
 )
 
@@ -14,6 +15,7 @@ import (
 type Builder struct {
 	conn      *dialects.Connection
 	tableName string
+	schema    *schema.Schema
 }
 
 // New creates a new query builder for the given table.
@@ -24,12 +26,22 @@ func New(conn *dialects.Connection, tableName string) *Builder {
 	}
 }
 
+// NewWithSchema creates a query builder with schema awareness for eager loading.
+func NewWithSchema(conn *dialects.Connection, tableName string, sch *schema.Schema) *Builder {
+	return &Builder{
+		conn:      conn,
+		tableName: tableName,
+		schema:    sch,
+	}
+}
+
 // Select creates a SELECT query builder.
 func (b *Builder) Select(columns ...string) *SelectBuilder {
 	return &SelectBuilder{
 		conn:      b.conn,
 		tableName: b.tableName,
 		columns:   columns,
+		schema:    b.schema,
 	}
 }
 

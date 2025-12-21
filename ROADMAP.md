@@ -38,7 +38,7 @@
 ## 🔮 v0.3.0 - Relations & Eager Loading
 
 - [x] Auto-detect relations from schema
-- [ ] Eager loading (Include/Preload)
+- [x] Eager loading (Include/Preload)
 - [ ] Lazy loading with proxy
 - [ ] Cascade delete/update
 - [ ] Many-to-many with junction tables

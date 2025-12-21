@@ -203,6 +203,19 @@ for _, rel := range post.GetBelongsTo() {
 
 // Explicit references (when conventions don't apply)
 m.Int("author").Ref("User")
+
+// Eager loading - automatically fetch related data
+posts := query.NewWithSchema(conn, "posts", s)
+results, _ := posts.Select().Include("User").All(ctx)
+
+for _, post := range results {
+    user := post["User"].(query.Result)
+    fmt.Printf("Post '%s' by %s\n", post["title"], user["name"])
+}
+
+// HasMany - load children for each parent
+users := query.NewWithSchema(conn, "users", s)
+results, _ = users.Select().Include("Post").All(ctx)
 ```
 
 ### Dialect Support
