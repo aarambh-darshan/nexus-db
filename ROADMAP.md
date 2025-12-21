@@ -41,7 +41,7 @@
 - [x] Eager loading (Include/Preload)
 - [x] Lazy loading with proxy
 - [x] Cascade delete/update
-- [ ] Many-to-many with junction tables
+- [x] Many-to-many with junction tables
 
 ---
 

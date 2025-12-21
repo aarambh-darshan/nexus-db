@@ -329,13 +329,15 @@ const (
 
 // Relation represents a relationship between models.
 type Relation struct {
-	Type           RelationType
-	TargetModel    string
-	ForeignKey     string
-	ReferenceKey   string
-	Through        string        // For many-to-many
-	OnDeleteAction CascadeAction // Action on parent delete
-	OnUpdateAction CascadeAction // Action on parent update
+	Type             RelationType
+	TargetModel      string
+	ForeignKey       string
+	ReferenceKey     string
+	Through          string        // Junction table name for many-to-many
+	ThroughSourceKey string        // FK in junction pointing to source model
+	ThroughTargetKey string        // FK in junction pointing to target model
+	OnDeleteAction   CascadeAction // Action on parent delete
+	OnUpdateAction   CascadeAction // Action on parent update
 }
 
 // OnDelete sets the cascade action for delete operations.
@@ -348,6 +350,21 @@ func (r *Relation) OnDelete(action CascadeAction) *Relation {
 func (r *Relation) OnUpdate(action CascadeAction) *Relation {
 	r.OnUpdateAction = action
 	return r
+}
+
+// BelongsToMany creates a many-to-many relation via a junction table.
+// Example: m.BelongsToMany("Tag", "user_tags", "user_id", "tag_id")
+func (m *Model) BelongsToMany(targetModel, through, sourceKey, targetKey string) *Relation {
+	rel := &Relation{
+		Type:             RelationManyToMany,
+		TargetModel:      targetModel,
+		Through:          through,
+		ThroughSourceKey: sourceKey,
+		ThroughTargetKey: targetKey,
+		ReferenceKey:     "id",
+	}
+	m.Relations = append(m.Relations, rel)
+	return rel
 }
 
 // Validate validates the schema for correctness.

@@ -80,6 +80,8 @@ func (lr *LazyResult) GetRelation(ctx context.Context, name string) (interface{}
 		result, err = lr.loadHasMany(ctx, rel)
 	case schema.RelationHasOne:
 		result, err = lr.loadHasOne(ctx, rel)
+	case schema.RelationManyToMany:
+		result, err = lr.loadBelongsToMany(ctx, rel)
 	default:
 		return nil, nil
 	}
@@ -232,4 +234,78 @@ func (lr LazyResults) ToResults() Results {
 		results[i] = r.Data()
 	}
 	return results
+}
+
+// loadBelongsToMany loads related records via a junction table.
+func (lr *LazyResult) loadBelongsToMany(ctx context.Context, rel *schema.Relation) (LazyResults, error) {
+	pkValue := lr.data[rel.ReferenceKey]
+	if pkValue == nil {
+		return LazyResults{}, nil
+	}
+
+	dialect := lr.conn.Dialect
+
+	// Query junction table
+	junctionQuery := fmt.Sprintf("SELECT %s FROM %s WHERE %s = %s",
+		dialect.Quote(rel.ThroughTargetKey),
+		dialect.Quote(rel.Through),
+		dialect.Quote(rel.ThroughSourceKey),
+		dialect.Placeholder(1))
+
+	junctionRows, err := lr.conn.Query(ctx, junctionQuery, pkValue)
+	if err != nil {
+		return nil, err
+	}
+	defer junctionRows.Close()
+
+	junctionResults, err := scanRows(junctionRows)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(junctionResults) == 0 {
+		return LazyResults{}, nil
+	}
+
+	// Collect target IDs
+	targetIDs := make([]interface{}, 0, len(junctionResults))
+	for _, jr := range junctionResults {
+		if tid := jr[rel.ThroughTargetKey]; tid != nil {
+			targetIDs = append(targetIDs, tid)
+		}
+	}
+
+	if len(targetIDs) == 0 {
+		return LazyResults{}, nil
+	}
+
+	// Query target table
+	targetTable := toTableName(rel.TargetModel)
+	placeholders := make([]string, len(targetIDs))
+	for i := range targetIDs {
+		placeholders[i] = dialect.Placeholder(i + 1)
+	}
+
+	targetQuery := fmt.Sprintf("SELECT * FROM %s WHERE %s IN (%s)",
+		dialect.Quote(targetTable),
+		dialect.Quote("id"),
+		strings.Join(placeholders, ", "))
+
+	targetRows, err := lr.conn.Query(ctx, targetQuery, targetIDs...)
+	if err != nil {
+		return nil, err
+	}
+	defer targetRows.Close()
+
+	targetResults, err := scanRows(targetRows)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make(LazyResults, len(targetResults))
+	for i, r := range targetResults {
+		results[i] = NewLazyResult(r, lr.conn, lr.schema, targetTable)
+	}
+
+	return results, nil
 }

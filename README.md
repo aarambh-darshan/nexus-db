@@ -231,6 +231,12 @@ for _, post := range lazyPosts {
 // Configure: rel.OnDelete(schema.Cascade) or schema.SetNull or schema.Restrict
 users := query.NewWithSchema(conn, "users", s)
 users.Delete().Where(query.Eq("id", 1)).Cascade().Exec(ctx)  // Deletes user AND posts
+
+// Many-to-many relations via junction tables
+s.Model("User", func(m *schema.Model) {
+    m.BelongsToMany("Tag", "user_tags", "user_id", "tag_id")
+})
+results, _ = users.Select().Include("Tag").All(ctx)  // Load users with their tags
 ```
 
 ### Dialect Support

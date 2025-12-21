@@ -48,6 +48,10 @@ func (s *SelectBuilder) preloadRelations(ctx context.Context, results Results) e
 			if err := s.preloadHasOne(ctx, results, rel); err != nil {
 				return err
 			}
+		case schema.RelationManyToMany:
+			if err := s.preloadBelongsToMany(ctx, results, rel); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -230,4 +234,122 @@ func collectFieldValues(results Results, fieldName string) []interface{} {
 // User -> users, Post -> posts
 func toTableName(modelName string) string {
 	return strings.ToLower(modelName) + "s"
+}
+
+// preloadBelongsToMany loads related records via a junction table.
+// Example: For Users with Tags via user_tags, loads all tags for each user.
+func (s *SelectBuilder) preloadBelongsToMany(ctx context.Context, results Results, rel *schema.Relation) error {
+	if len(results) == 0 {
+		return nil
+	}
+
+	// Step 1: Collect source IDs from results
+	sourceIDs := collectFieldValues(results, rel.ReferenceKey)
+	if len(sourceIDs) == 0 {
+		return nil
+	}
+
+	dialect := s.conn.Dialect
+
+	// Step 2: Query junction table for mappings
+	placeholders := make([]string, len(sourceIDs))
+	for i := range sourceIDs {
+		placeholders[i] = dialect.Placeholder(i + 1)
+	}
+
+	junctionQuery := fmt.Sprintf("SELECT %s, %s FROM %s WHERE %s IN (%s)",
+		dialect.Quote(rel.ThroughSourceKey),
+		dialect.Quote(rel.ThroughTargetKey),
+		dialect.Quote(rel.Through),
+		dialect.Quote(rel.ThroughSourceKey),
+		strings.Join(placeholders, ", "))
+
+	junctionRows, err := s.conn.Query(ctx, junctionQuery, sourceIDs...)
+	if err != nil {
+		return err
+	}
+	defer junctionRows.Close()
+
+	junctionResults, err := scanRows(junctionRows)
+	if err != nil {
+		return err
+	}
+
+	if len(junctionResults) == 0 {
+		// No relations, set empty slices
+		for i := range results {
+			results[i][rel.TargetModel] = Results{}
+		}
+		return nil
+	}
+
+	// Step 3: Collect target IDs and build source->target mapping
+	targetIDs := make([]interface{}, 0)
+	targetIDSet := make(map[interface{}]bool)
+	sourceToTargets := make(map[interface{}][]interface{})
+
+	for _, jr := range junctionResults {
+		sourceID := jr[rel.ThroughSourceKey]
+		targetID := jr[rel.ThroughTargetKey]
+
+		if !targetIDSet[targetID] {
+			targetIDSet[targetID] = true
+			targetIDs = append(targetIDs, targetID)
+		}
+
+		sourceToTargets[sourceID] = append(sourceToTargets[sourceID], targetID)
+	}
+
+	if len(targetIDs) == 0 {
+		for i := range results {
+			results[i][rel.TargetModel] = Results{}
+		}
+		return nil
+	}
+
+	// Step 4: Query target table
+	targetTable := toTableName(rel.TargetModel)
+	targetPlaceholders := make([]string, len(targetIDs))
+	for i := range targetIDs {
+		targetPlaceholders[i] = dialect.Placeholder(i + 1)
+	}
+
+	targetQuery := fmt.Sprintf("SELECT * FROM %s WHERE %s IN (%s)",
+		dialect.Quote(targetTable),
+		dialect.Quote("id"),
+		strings.Join(targetPlaceholders, ", "))
+
+	targetRows, err := s.conn.Query(ctx, targetQuery, targetIDs...)
+	if err != nil {
+		return err
+	}
+	defer targetRows.Close()
+
+	targetResults, err := scanRows(targetRows)
+	if err != nil {
+		return err
+	}
+
+	// Build target lookup: id -> result
+	targetLookup := make(map[interface{}]Result)
+	for _, tr := range targetResults {
+		targetLookup[tr["id"]] = tr
+	}
+
+	// Step 5: Associate targets to source results
+	for i := range results {
+		sourceID := results[i][rel.ReferenceKey]
+		relatedTargetIDs := sourceToTargets[sourceID]
+
+		relatedResults := make(Results, 0, len(relatedTargetIDs))
+		for _, targetID := range relatedTargetIDs {
+			if target, ok := targetLookup[targetID]; ok {
+				relatedResults = append(relatedResults, target)
+			}
+		}
+
+		results[i][rel.TargetModel] = relatedResults
+	}
+
+	return nil
 }
