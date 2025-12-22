@@ -50,8 +50,8 @@
 - [x] Schema diff detection (auto-generate migrations)
 - [x] Migration squashing
 - [x] Seed data support
-- [ ] Rollback to specific version
-- [ ] Migration locking (prevent concurrent runs)
+- [x] Rollback to specific version
+- [x] Migration locking (prevent concurrent runs)
 - [ ] SQL migration validation
 
 ---

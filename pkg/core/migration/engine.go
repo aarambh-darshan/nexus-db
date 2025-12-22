@@ -37,16 +37,18 @@ type MigrationHistory struct {
 
 // Engine manages database migrations.
 type Engine struct {
-	conn       *dialects.Connection
-	migrations []*Migration
-	tableName  string
+	conn          *dialects.Connection
+	migrations    []*Migration
+	tableName     string
+	lockTableName string
 }
 
 // NewEngine creates a new migration engine.
 func NewEngine(conn *dialects.Connection) *Engine {
 	return &Engine{
-		conn:      conn,
-		tableName: "_nexus_migrations",
+		conn:          conn,
+		tableName:     "_nexus_migrations",
+		lockTableName: "_nexus_migration_lock",
 	}
 }
 
@@ -198,6 +200,81 @@ func (e *Engine) Down(ctx context.Context) error {
 	}
 
 	return e.rollbackMigration(ctx, migration)
+}
+
+// DownTo rolls back migrations until reaching the specified target migration ID.
+// The target migration itself will NOT be rolled back.
+// Returns the number of migrations rolled back.
+func (e *Engine) DownTo(ctx context.Context, targetID string) (int, error) {
+	applied, err := e.getApplied(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(applied) == 0 {
+		return 0, fmt.Errorf("no migrations to rollback")
+	}
+
+	// Find the target migration index in applied list
+	targetIdx := -1
+	for i, h := range applied {
+		if strings.HasPrefix(h.MigrationID, targetID) {
+			targetIdx = i
+			break
+		}
+	}
+
+	if targetIdx == -1 {
+		return 0, fmt.Errorf("target migration %s not found in applied migrations", targetID)
+	}
+
+	// Rollback from the last applied down to (but not including) the target
+	count := 0
+	for i := len(applied) - 1; i > targetIdx; i-- {
+		h := applied[i]
+
+		// Find corresponding migration
+		var migration *Migration
+		for _, m := range e.migrations {
+			if m.ID == h.MigrationID {
+				migration = m
+				break
+			}
+		}
+
+		if migration == nil {
+			return count, fmt.Errorf("migration %s not found in loaded migrations", h.MigrationID)
+		}
+
+		if err := e.rollbackMigration(ctx, migration); err != nil {
+			return count, fmt.Errorf("rolling back %s: %w", migration.ID, err)
+		}
+		count++
+	}
+
+	return count, nil
+}
+
+// DownN rolls back the specified number of migrations.
+// Returns the number of migrations actually rolled back.
+func (e *Engine) DownN(ctx context.Context, n int) (int, error) {
+	if n <= 0 {
+		return 0, fmt.Errorf("n must be positive")
+	}
+
+	count := 0
+	for i := 0; i < n; i++ {
+		if err := e.Down(ctx); err != nil {
+			if count == 0 {
+				return 0, err
+			}
+			// We've rolled back some, but hit an error or end
+			break
+		}
+		count++
+	}
+
+	return count, nil
 }
 
 // Status returns the status of all migrations.
