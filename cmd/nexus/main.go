@@ -114,6 +114,16 @@ Use --force to break stale locks.`,
 		},
 	})
 
+	// migrate validate
+	cmd.AddCommand(&cobra.Command{
+		Use:   "validate",
+		Short: "Validate migration SQL files",
+		Long:  "Checks all migration files for syntax errors and warns about dangerous operations.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cli.MigrateValidate()
+		},
+	})
+
 	// migrate reset
 	cmd.AddCommand(&cobra.Command{
 		Use:   "reset",
