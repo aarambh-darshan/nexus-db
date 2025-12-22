@@ -82,13 +82,21 @@ func migrateCmd() *cobra.Command {
 	})
 
 	// migrate down
-	cmd.AddCommand(&cobra.Command{
+	downCmd := &cobra.Command{
 		Use:   "down",
-		Short: "Rollback the last migration",
+		Short: "Rollback migrations",
+		Long: `Rollback migrations. By default rolls back the last migration.
+Use --to to rollback to a specific version (exclusive).
+Use -n to rollback a specific number of migrations.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cli.MigrateDown()
+			to, _ := cmd.Flags().GetString("to")
+			n, _ := cmd.Flags().GetInt("n")
+			return cli.MigrateDown(to, n)
 		},
-	})
+	}
+	downCmd.Flags().String("to", "", "Rollback to this migration ID (exclusive)")
+	downCmd.Flags().IntP("n", "n", 0, "Number of migrations to rollback")
+	cmd.AddCommand(downCmd)
 
 	// migrate status
 	cmd.AddCommand(&cobra.Command{

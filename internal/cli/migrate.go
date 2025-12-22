@@ -112,8 +112,11 @@ func MigrateUp() error {
 	return nil
 }
 
-// MigrateDown rolls back the last migration.
-func MigrateDown() error {
+// MigrateDown rolls back migrations.
+// If targetID is specified, rolls back to that migration (exclusive).
+// If n > 0, rolls back n migrations.
+// Otherwise rolls back just the last migration.
+func MigrateDown(targetID string, n int) error {
 	config, err := LoadConfig()
 	if err != nil {
 		return err
@@ -138,12 +141,33 @@ func MigrateDown() error {
 		return fmt.Errorf("loading migrations: %w", err)
 	}
 
-	// Rollback
-	if err := engine.Down(ctx); err != nil {
-		return fmt.Errorf("rolling back: %w", err)
+	// Determine rollback mode
+	if targetID != "" {
+		// Rollback to specific version
+		count, err := engine.DownTo(ctx, targetID)
+		if err != nil {
+			return fmt.Errorf("rolling back to %s: %w", targetID, err)
+		}
+		if count == 0 {
+			fmt.Printf("Already at or before migration %s\n", targetID)
+		} else {
+			fmt.Printf("✓ Rolled back %d migration(s) to %s\n", count, targetID)
+		}
+	} else if n > 0 {
+		// Rollback n migrations
+		count, err := engine.DownN(ctx, n)
+		if err != nil {
+			return fmt.Errorf("rolling back: %w", err)
+		}
+		fmt.Printf("✓ Rolled back %d migration(s)\n", count)
+	} else {
+		// Rollback just the last one
+		if err := engine.Down(ctx); err != nil {
+			return fmt.Errorf("rolling back: %w", err)
+		}
+		fmt.Println("✓ Rolled back last migration")
 	}
 
-	fmt.Println("✓ Rolled back last migration")
 	return nil
 }
 

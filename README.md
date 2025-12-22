@@ -124,8 +124,14 @@ nexus migrate squash initial_schema
 # Apply migrations
 nexus migrate up
 
-# Rollback
+# Rollback last migration
 nexus migrate down
+
+# Rollback to specific version (v0.4.0+)
+nexus migrate down --to 20231201_100000
+
+# Rollback multiple migrations (v0.4.0+)
+nexus migrate down -n 3
 
 # Check status
 nexus migrate status
