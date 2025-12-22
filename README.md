@@ -161,6 +161,13 @@ nexus dev
 nexus dev --no-gen          # Watch without auto-generation
 nexus dev --poll            # Use polling (for network drives)
 nexus dev --interval 1s     # Set debounce interval
+
+# Database browser UI (v0.5.0+)
+nexus studio
+
+# Studio options
+nexus studio --port 3000    # Use custom port
+nexus studio --no-open      # Don't auto-open browser
 ```
 
 ## Features
