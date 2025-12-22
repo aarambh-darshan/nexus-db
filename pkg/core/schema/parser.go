@@ -8,15 +8,18 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	nxerr "github.com/nexus-db/nexus/pkg/errors"
 )
 
 // Parser parses .nexus schema files.
 type Parser struct {
 	input  string
+	lines  []string // All lines for context
 	pos    int
 	line   int
 	col    int
-	errors []error
+	errors []*nxerr.NexusError
 }
 
 // NewParser creates a new parser for the given input.
@@ -49,7 +52,8 @@ func (p *Parser) Parse() (*Schema, error) {
 		if strings.HasPrefix(line, "model ") {
 			name := p.parseModelName(line)
 			if name == "" {
-				p.errors = append(p.errors, fmt.Errorf("line %d: invalid model definition", p.line))
+				p.addError(nxerr.ErrSchemaInvalidModel, "Invalid model definition", line).
+					WithSuggestion("Use format: model ModelName {")
 				continue
 			}
 			currentModel = &Model{
@@ -71,9 +75,9 @@ func (p *Parser) Parse() (*Schema, error) {
 
 		// Field definition inside model
 		if inModel && currentModel != nil {
-			field, err := p.parseField(line)
-			if err != nil {
-				p.errors = append(p.errors, fmt.Errorf("line %d: %w", p.line, err))
+			field, nxErr := p.parseField(line)
+			if nxErr != nil {
+				p.errors = append(p.errors, nxErr)
 				continue
 			}
 			if field != nil {
@@ -85,7 +89,7 @@ func (p *Parser) Parse() (*Schema, error) {
 	}
 
 	if len(p.errors) > 0 {
-		return nil, fmt.Errorf("parse errors: %v", p.errors)
+		return nil, p.formatErrors()
 	}
 
 	return schema, nil
@@ -101,7 +105,7 @@ func (p *Parser) parseModelName(line string) string {
 	return matches[1]
 }
 
-func (p *Parser) parseField(line string) (*Field, error) {
+func (p *Parser) parseField(line string) (*Field, *nxerr.NexusError) {
 	// Skip closing brace or empty
 	if line == "}" || line == "{" {
 		return nil, nil
@@ -110,7 +114,8 @@ func (p *Parser) parseField(line string) (*Field, error) {
 	// Parse: fieldName Type @modifier1 @modifier2(arg)
 	parts := strings.Fields(line)
 	if len(parts) < 2 {
-		return nil, fmt.Errorf("invalid field definition: %s", line)
+		return nil, p.makeError(nxerr.ErrSchemaInvalidField, "Invalid field definition", line).
+			WithSuggestion("Use format: fieldName Type @modifier")
 	}
 
 	fieldName := parts[0]
@@ -130,9 +135,15 @@ func (p *Parser) parseField(line string) (*Field, error) {
 		return nil, nil
 	}
 
+	// Validate type and get suggestions for unknown types
+	parsedType, typeErr := p.parseFieldTypeWithValidation(fieldType, line)
+	if typeErr != nil {
+		return nil, typeErr
+	}
+
 	field := &Field{
 		Name:     fieldName,
-		Type:     p.parseFieldType(fieldType),
+		Type:     parsedType,
 		Nullable: nullable,
 	}
 
@@ -140,45 +151,61 @@ func (p *Parser) parseField(line string) (*Field, error) {
 	for i := 2; i < len(parts); i++ {
 		modifier := parts[i]
 		if err := p.applyModifier(field, modifier); err != nil {
-			return nil, err
+			return nil, p.makeError(nxerr.ErrSchemaInvalidModifier, err.Error(), line).
+				WithSuggestion(nxerr.Suggestions[nxerr.ErrSchemaInvalidModifier])
 		}
 	}
 
 	return field, nil
 }
 
-func (p *Parser) parseFieldType(typeName string) FieldType {
+func (p *Parser) parseFieldTypeWithValidation(typeName, context string) (FieldType, *nxerr.NexusError) {
 	switch strings.ToLower(typeName) {
 	case "int", "integer":
-		return FieldTypeInt
+		return FieldTypeInt, nil
 	case "bigint":
-		return FieldTypeBigInt
+		return FieldTypeBigInt, nil
 	case "string", "varchar":
-		return FieldTypeString
+		return FieldTypeString, nil
 	case "text":
-		return FieldTypeText
+		return FieldTypeText, nil
 	case "bool", "boolean":
-		return FieldTypeBool
+		return FieldTypeBool, nil
 	case "float", "double":
-		return FieldTypeFloat
+		return FieldTypeFloat, nil
 	case "decimal", "numeric":
-		return FieldTypeDecimal
+		return FieldTypeDecimal, nil
 	case "datetime", "timestamp":
-		return FieldTypeDateTime
+		return FieldTypeDateTime, nil
 	case "date":
-		return FieldTypeDate
+		return FieldTypeDate, nil
 	case "time":
-		return FieldTypeTime
+		return FieldTypeTime, nil
 	case "json", "jsonb":
-		return FieldTypeJSON
+		return FieldTypeJSON, nil
 	case "bytes", "blob", "binary":
-		return FieldTypeBytes
+		return FieldTypeBytes, nil
 	case "uuid":
-		return FieldTypeUUID
+		return FieldTypeUUID, nil
 	default:
-		// Could be a relation, treat as string for now
-		return FieldTypeString
+		// Check if it looks like a relation (capitalized) - allow it
+		if len(typeName) > 0 && typeName[0] >= 'A' && typeName[0] <= 'Z' {
+			return FieldTypeString, nil // Treat as relation reference
+		}
+
+		// Unknown type - suggest similar
+		suggestion := nxerr.SuggestSimilar(typeName, nxerr.ValidTypes)
+		if suggestion == "" {
+			suggestion = nxerr.Suggestions[nxerr.ErrSchemaUnknownType]
+		}
+		return FieldTypeString, p.makeError(nxerr.ErrSchemaUnknownType,
+			fmt.Sprintf("Unknown type '%s'", typeName), context).WithSuggestion(suggestion)
 	}
+}
+
+func (p *Parser) parseFieldType(typeName string) FieldType {
+	ft, _ := p.parseFieldTypeWithValidation(typeName, "")
+	return ft
 }
 
 func (p *Parser) applyModifier(field *Field, modifier string) error {
@@ -287,4 +314,37 @@ func ParseFile(path string) (*Schema, error) {
 		return nil, err
 	}
 	return NewParser(string(content)).Parse()
+}
+
+// Helper methods for structured errors
+
+func (p *Parser) addError(code nxerr.ErrorCode, message, context string) *nxerr.NexusError {
+	err := p.makeError(code, message, context)
+	p.errors = append(p.errors, err)
+	return err
+}
+
+func (p *Parser) makeError(code nxerr.ErrorCode, message, context string) *nxerr.NexusError {
+	return &nxerr.NexusError{
+		Code:    code,
+		Message: message,
+		Line:    p.line,
+		Context: context,
+	}
+}
+
+func (p *Parser) formatErrors() error {
+	if len(p.errors) == 0 {
+		return nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Schema parsing failed with %d error(s):\n\n", len(p.errors)))
+
+	for _, e := range p.errors {
+		sb.WriteString(e.Print())
+		sb.WriteString("\n")
+	}
+
+	return fmt.Errorf(sb.String())
 }

@@ -56,3 +56,8 @@ migrations/
 tmp/
 temp/
 sample/
+
+# Frontend build artifacts
+web/studio/node_modules/
+web/studio/.svelte-kit/
+
