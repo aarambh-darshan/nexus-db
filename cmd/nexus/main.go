@@ -107,6 +107,17 @@ func migrateCmd() *cobra.Command {
 		},
 	})
 
+	// migrate diff
+	cmd.AddCommand(&cobra.Command{
+		Use:   "diff <name>",
+		Short: "Auto-generate migration from schema changes",
+		Long:  "Compares your schema with the database and generates a migration with the detected changes.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cli.MigrateDiff(args[0])
+		},
+	})
+
 	return cmd
 }
 

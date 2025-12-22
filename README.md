@@ -115,6 +115,9 @@ nexus init
 # Create migration
 nexus migrate new create_users
 
+# Auto-generate migration from schema changes (v0.4.0+)
+nexus migrate diff add_posts
+
 # Apply migrations
 nexus migrate up
 

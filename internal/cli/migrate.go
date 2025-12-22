@@ -339,3 +339,80 @@ func MigrateFresh(name string) error {
 	fmt.Printf("✓ Created migration: %s\n", migrationPath)
 	return nil
 }
+
+// MigrateDiff compares the schema with the current database and generates a migration.
+func MigrateDiff(name string) error {
+	config, err := LoadConfig()
+	if err != nil {
+		return err
+	}
+
+	// Parse schema
+	s, err := schema.ParseFile(config.Schema.Path)
+	if err != nil {
+		return fmt.Errorf("parsing schema: %w", err)
+	}
+
+	if err := s.Validate(); err != nil {
+		return fmt.Errorf("validating schema: %w", err)
+	}
+
+	// Connect to database
+	conn, err := connect(config)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	ctx := context.Background()
+
+	// Get the introspector from the dialect
+	introspector, ok := conn.Dialect.(migration.Introspector)
+	if !ok {
+		return fmt.Errorf("dialect %s does not support introspection", conn.Dialect.Name())
+	}
+
+	// Introspect current database state
+	fmt.Println("Introspecting database...")
+	snapshot, err := migration.IntrospectDatabase(ctx, conn.DB, introspector)
+	if err != nil {
+		return fmt.Errorf("introspecting database: %w", err)
+	}
+
+	// Compute diff
+	fmt.Println("Computing schema diff...")
+	diff := migration.Diff(s, snapshot)
+
+	if !diff.HasChanges() {
+		fmt.Println("No schema changes detected. Database is up to date.")
+		return nil
+	}
+
+	// Display changes
+	fmt.Println("\nDetected changes:")
+	for _, desc := range migration.DescribeChanges(diff.Changes) {
+		fmt.Printf("  %s\n", desc)
+	}
+	fmt.Println()
+
+	// Generate migration
+	m, err := migration.GenerateMigrationFromDiff(conn.Dialect, diff.Changes, name)
+	if err != nil {
+		return fmt.Errorf("generating migration: %w", err)
+	}
+
+	// Ensure migrations directory exists
+	if err := os.MkdirAll(migrationsDir, 0755); err != nil {
+		return err
+	}
+
+	// Save migration file
+	if err := migration.SaveMigration(migrationsDir, m); err != nil {
+		return fmt.Errorf("saving migration: %w", err)
+	}
+
+	filename := fmt.Sprintf("%s_%s.sql", m.ID, m.Name)
+	fmt.Printf("✓ Created migration: %s/%s\n", migrationsDir, filename)
+
+	return nil
+}
