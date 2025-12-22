@@ -130,6 +130,15 @@ nexus migrate down
 # Check status
 nexus migrate status
 
+# Run seed data (v0.4.0+)
+nexus seed
+
+# Run seeds for specific environment
+nexus seed --env dev
+
+# Create new seed file
+nexus seed new users
+
 # Generate Go types
 nexus gen
 ```

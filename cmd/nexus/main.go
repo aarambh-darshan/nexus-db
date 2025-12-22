@@ -26,6 +26,7 @@ func main() {
 	// Add subcommands
 	rootCmd.AddCommand(initCmd())
 	rootCmd.AddCommand(migrateCmd())
+	rootCmd.AddCommand(seedCmd())
 	rootCmd.AddCommand(genCmd())
 	rootCmd.AddCommand(devCmd())
 
@@ -137,6 +138,62 @@ Original migrations are backed up to migrations/.squashed_backup/`,
 	squashCmd.Flags().String("to", "", "End at this migration ID (inclusive)")
 	squashCmd.Flags().Bool("keep-originals", false, "Keep original migration files (don't move to backup)")
 	cmd.AddCommand(squashCmd)
+
+	return cmd
+}
+
+// seedCmd handles database seeding
+func seedCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "seed",
+		Short: "Manage database seed data",
+		Long:  "Load initial or test data into the database from seed files.",
+	}
+
+	// seed (run)
+	runCmd := &cobra.Command{
+		Use:   "run",
+		Short: "Run pending seeds",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			env, _ := cmd.Flags().GetString("env")
+			reset, _ := cmd.Flags().GetBool("reset")
+			return cli.SeedRun(env, reset)
+		},
+	}
+	runCmd.Flags().String("env", "", "Environment to run seeds for (dev, test, prod)")
+	runCmd.Flags().Bool("reset", false, "Clear seed history and re-run all seeds")
+	cmd.AddCommand(runCmd)
+
+	// Make "run" the default action when just "nexus seed" is called
+	cmd.RunE = func(c *cobra.Command, args []string) error {
+		env, _ := c.Flags().GetString("env")
+		reset, _ := c.Flags().GetBool("reset")
+		return cli.SeedRun(env, reset)
+	}
+	cmd.Flags().String("env", "", "Environment to run seeds for (dev, test, prod)")
+	cmd.Flags().Bool("reset", false, "Clear seed history and re-run all seeds")
+
+	// seed status
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Show seed status",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cli.SeedStatus()
+		},
+	})
+
+	// seed new
+	newCmd := &cobra.Command{
+		Use:   "new <name>",
+		Short: "Create a new seed file",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			env, _ := cmd.Flags().GetString("env")
+			return cli.SeedCreate(args[0], env)
+		},
+	}
+	newCmd.Flags().String("env", "", "Environment for the seed (dev, test, prod)")
+	cmd.AddCommand(newCmd)
 
 	return cmd
 }
