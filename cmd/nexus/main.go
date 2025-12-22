@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -237,14 +238,37 @@ func genCmd() *cobra.Command {
 
 // devCmd runs in development mode
 func devCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "dev",
 		Short: "Run in development mode (watch + auto-generate)",
-		Long:  "Watches schema files and auto-generates code on changes.",
+		Long: `Watches schema files and auto-generates code on changes.
+
+The watcher monitors your schema.nexus file and automatically runs
+code generation whenever changes are detected. Use Ctrl+C to stop.
+
+Examples:
+  nexus dev                    # Start watching with defaults
+  nexus dev --no-gen           # Watch without auto-generation
+  nexus dev --poll             # Use polling (for network drives)
+  nexus dev --interval 1s      # Set debounce interval`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("Development mode is not yet implemented.")
-			fmt.Println("For now, run 'nexus gen' manually after schema changes.")
-			return nil
+			opts := cli.DefaultDevOptions()
+
+			noGen, _ := cmd.Flags().GetBool("no-gen")
+			poll, _ := cmd.Flags().GetBool("poll")
+			interval, _ := cmd.Flags().GetDuration("interval")
+
+			opts.NoGen = noGen
+			opts.Poll = poll
+			opts.Interval = interval
+
+			return cli.Dev(opts)
 		},
 	}
+
+	cmd.Flags().Bool("no-gen", false, "Disable automatic code generation")
+	cmd.Flags().Bool("poll", false, "Use polling instead of OS events (for network drives)")
+	cmd.Flags().Duration("interval", 500*time.Millisecond, "Debounce/poll interval")
+
+	return cmd
 }

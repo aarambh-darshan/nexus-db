@@ -153,6 +153,14 @@ nexus seed new users
 
 # Generate Go types
 nexus gen
+
+# Watch mode with hot reload (v0.5.0+)
+nexus dev
+
+# Watch mode options
+nexus dev --no-gen          # Watch without auto-generation
+nexus dev --poll            # Use polling (for network drives)
+nexus dev --interval 1s     # Set debounce interval
 ```
 
 ## Features

@@ -58,7 +58,7 @@
 
 ## 🔮 v0.5.0 - Developer Experience
 
-- [ ] `nexus dev` - Watch mode with hot reload
+- [x] `nexus dev` - Watch mode with hot reload
 - [ ] `nexus studio` - Database browser UI
 - [ ] Better error messages with suggestions
 - [ ] Query plan analysis
