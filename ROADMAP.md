@@ -52,7 +52,7 @@
 - [x] Seed data support
 - [x] Rollback to specific version
 - [x] Migration locking (prevent concurrent runs)
-- [ ] SQL migration validation
+- [x] SQL migration validation
 
 ---
 

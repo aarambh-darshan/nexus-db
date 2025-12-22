@@ -136,6 +136,9 @@ nexus migrate down -n 3
 # Check status
 nexus migrate status
 
+# Validate migrations (v0.4.0+)
+nexus migrate validate
+
 # Force break stale locks (v0.4.0+)
 nexus migrate up --force
 

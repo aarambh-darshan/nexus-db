@@ -257,6 +257,87 @@ func MigrateStatus() error {
 	return nil
 }
 
+// MigrateValidate validates all migration files.
+func MigrateValidate() error {
+	// Load migrations from directory
+	files, err := os.ReadDir(migrationsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("No migrations directory found.")
+			return nil
+		}
+		return fmt.Errorf("reading migrations: %w", err)
+	}
+
+	var migrations []*migration.Migration
+	for _, f := range files {
+		if f.IsDir() || !strings.HasSuffix(f.Name(), ".sql") {
+			continue
+		}
+
+		content, err := os.ReadFile(filepath.Join(migrationsDir, f.Name()))
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", f.Name(), err)
+		}
+
+		m, err := parseMigrationFile(f.Name(), string(content))
+		if err != nil {
+			return fmt.Errorf("parsing %s: %w", f.Name(), err)
+		}
+
+		migrations = append(migrations, m)
+	}
+
+	if len(migrations) == 0 {
+		fmt.Println("No migrations found.")
+		return nil
+	}
+
+	fmt.Printf("Validating %d migration(s)...\n\n", len(migrations))
+
+	// Validate all migrations
+	results := migration.ValidateMigrations(migrations)
+
+	hasErrors := false
+	hasWarnings := false
+
+	for _, result := range results {
+		if len(result.Issues) == 0 {
+			continue
+		}
+
+		fmt.Printf("Migration: %s\n", result.MigrationID)
+
+		for _, issue := range result.Issues {
+			prefix := "⚠️  WARNING"
+			if issue.Severity == migration.SeverityError {
+				prefix = "❌ ERROR"
+				hasErrors = true
+			} else {
+				hasWarnings = true
+			}
+
+			fmt.Printf("  %s: %s\n", prefix, issue.Message)
+			if issue.Suggestion != "" {
+				fmt.Printf("     → %s\n", issue.Suggestion)
+			}
+		}
+		fmt.Println()
+	}
+
+	if hasErrors {
+		return fmt.Errorf("validation failed with errors")
+	}
+
+	if hasWarnings {
+		fmt.Println("✓ Validation passed with warnings")
+	} else {
+		fmt.Println("✓ All migrations are valid")
+	}
+
+	return nil
+}
+
 // MigrateReset drops all tables and reruns all migrations.
 func MigrateReset() error {
 	config, err := LoadConfig()
