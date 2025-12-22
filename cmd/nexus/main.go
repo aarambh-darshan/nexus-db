@@ -30,6 +30,7 @@ func main() {
 	rootCmd.AddCommand(seedCmd())
 	rootCmd.AddCommand(genCmd())
 	rootCmd.AddCommand(devCmd())
+	rootCmd.AddCommand(studioCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -269,6 +270,45 @@ Examples:
 	cmd.Flags().Bool("no-gen", false, "Disable automatic code generation")
 	cmd.Flags().Bool("poll", false, "Use polling instead of OS events (for network drives)")
 	cmd.Flags().Duration("interval", 500*time.Millisecond, "Debounce/poll interval")
+
+	return cmd
+}
+
+// studioCmd runs the database browser UI
+func studioCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "studio",
+		Short: "Open the database browser UI",
+		Long: `Starts a local web server with a database browser UI.
+
+The studio provides:
+  • Table browser with data viewing
+  • SQL query editor
+  • Schema visualization
+  • Migration status
+
+Examples:
+  nexus studio                  # Start on default port 4000
+  nexus studio --port 3000      # Use custom port
+  nexus studio --no-open        # Don't open browser automatically`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts := cli.DefaultStudioOptions()
+
+			port, _ := cmd.Flags().GetInt("port")
+			host, _ := cmd.Flags().GetString("host")
+			noOpen, _ := cmd.Flags().GetBool("no-open")
+
+			opts.Port = port
+			opts.Host = host
+			opts.NoOpen = noOpen
+
+			return cli.Studio(opts)
+		},
+	}
+
+	cmd.Flags().Int("port", 4000, "Port to run the studio server on")
+	cmd.Flags().String("host", "localhost", "Host to bind the server to")
+	cmd.Flags().Bool("no-open", false, "Don't automatically open browser")
 
 	return cmd
 }
