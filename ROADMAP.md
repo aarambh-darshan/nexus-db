@@ -51,7 +51,7 @@
 - [x] Migration squashing
 - [x] Seed data support
 - [x] Rollback to specific version
-- [ ] Migration locking (prevent concurrent runs)
+- [x] Migration locking (prevent concurrent runs)
 - [ ] SQL migration validation
 
 ---

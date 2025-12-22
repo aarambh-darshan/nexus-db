@@ -37,16 +37,18 @@ type MigrationHistory struct {
 
 // Engine manages database migrations.
 type Engine struct {
-	conn       *dialects.Connection
-	migrations []*Migration
-	tableName  string
+	conn          *dialects.Connection
+	migrations    []*Migration
+	tableName     string
+	lockTableName string
 }
 
 // NewEngine creates a new migration engine.
 func NewEngine(conn *dialects.Connection) *Engine {
 	return &Engine{
-		conn:      conn,
-		tableName: "_nexus_migrations",
+		conn:          conn,
+		tableName:     "_nexus_migrations",
+		lockTableName: "_nexus_migration_lock",
 	}
 }
 

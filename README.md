@@ -136,6 +136,9 @@ nexus migrate down -n 3
 # Check status
 nexus migrate status
 
+# Force break stale locks (v0.4.0+)
+nexus migrate up --force
+
 # Run seed data (v0.4.0+)
 nexus seed
 

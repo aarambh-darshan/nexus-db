@@ -68,7 +68,8 @@ func MigrateNew(name string) error {
 }
 
 // MigrateUp applies all pending migrations.
-func MigrateUp() error {
+// If force is true, breaks any stale locks before proceeding.
+func MigrateUp(force bool) error {
 	config, err := LoadConfig()
 	if err != nil {
 		return err
@@ -87,6 +88,20 @@ func MigrateUp() error {
 	if err := engine.Init(ctx); err != nil {
 		return fmt.Errorf("initializing migrations table: %w", err)
 	}
+
+	// Handle force unlock
+	if force {
+		if err := engine.ForceUnlock(ctx); err != nil {
+			return fmt.Errorf("force unlocking: %w", err)
+		}
+	}
+
+	// Acquire lock
+	lockOpts := migration.DefaultLockOptions()
+	if err := engine.AcquireLock(ctx, lockOpts); err != nil {
+		return fmt.Errorf("acquiring lock: %w", err)
+	}
+	defer engine.ReleaseLock(ctx)
 
 	// Load migrations
 	if err := engine.LoadFromDir(migrationsDir); err != nil {
@@ -116,7 +131,8 @@ func MigrateUp() error {
 // If targetID is specified, rolls back to that migration (exclusive).
 // If n > 0, rolls back n migrations.
 // Otherwise rolls back just the last migration.
-func MigrateDown(targetID string, n int) error {
+// If force is true, breaks any stale locks before proceeding.
+func MigrateDown(targetID string, n int, force bool) error {
 	config, err := LoadConfig()
 	if err != nil {
 		return err
@@ -135,6 +151,20 @@ func MigrateDown(targetID string, n int) error {
 	if err := engine.Init(ctx); err != nil {
 		return fmt.Errorf("initializing migrations table: %w", err)
 	}
+
+	// Handle force unlock
+	if force {
+		if err := engine.ForceUnlock(ctx); err != nil {
+			return fmt.Errorf("force unlocking: %w", err)
+		}
+	}
+
+	// Acquire lock
+	lockOpts := migration.DefaultLockOptions()
+	if err := engine.AcquireLock(ctx, lockOpts); err != nil {
+		return fmt.Errorf("acquiring lock: %w", err)
+	}
+	defer engine.ReleaseLock(ctx)
 
 	// Load migrations
 	if err := engine.LoadFromDir(migrationsDir); err != nil {

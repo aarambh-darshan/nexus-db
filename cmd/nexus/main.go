@@ -73,13 +73,17 @@ func migrateCmd() *cobra.Command {
 	})
 
 	// migrate up
-	cmd.AddCommand(&cobra.Command{
+	upCmd := &cobra.Command{
 		Use:   "up",
 		Short: "Apply pending migrations",
+		Long:  "Apply all pending migrations. Use --force to break stale locks.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return cli.MigrateUp()
+			force, _ := cmd.Flags().GetBool("force")
+			return cli.MigrateUp(force)
 		},
-	})
+	}
+	upCmd.Flags().Bool("force", false, "Force break any stale migration locks")
+	cmd.AddCommand(upCmd)
 
 	// migrate down
 	downCmd := &cobra.Command{
@@ -87,15 +91,18 @@ func migrateCmd() *cobra.Command {
 		Short: "Rollback migrations",
 		Long: `Rollback migrations. By default rolls back the last migration.
 Use --to to rollback to a specific version (exclusive).
-Use -n to rollback a specific number of migrations.`,
+Use -n to rollback a specific number of migrations.
+Use --force to break stale locks.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			to, _ := cmd.Flags().GetString("to")
 			n, _ := cmd.Flags().GetInt("n")
-			return cli.MigrateDown(to, n)
+			force, _ := cmd.Flags().GetBool("force")
+			return cli.MigrateDown(to, n, force)
 		},
 	}
 	downCmd.Flags().String("to", "", "Rollback to this migration ID (exclusive)")
 	downCmd.Flags().IntP("n", "n", 0, "Number of migrations to rollback")
+	downCmd.Flags().Bool("force", false, "Force break any stale migration locks")
 	cmd.AddCommand(downCmd)
 
 	// migrate status
