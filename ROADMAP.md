@@ -48,7 +48,7 @@
 ## 🔮 v0.4.0 - Advanced Migrations
 
 - [x] Schema diff detection (auto-generate migrations)
-- [ ] Migration squashing
+- [x] Migration squashing
 - [ ] Seed data support
 - [ ] Rollback to specific version
 - [ ] Migration locking (prevent concurrent runs)

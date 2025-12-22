@@ -118,6 +118,26 @@ func migrateCmd() *cobra.Command {
 		},
 	})
 
+	// migrate squash
+	squashCmd := &cobra.Command{
+		Use:   "squash <name>",
+		Short: "Combine multiple migrations into one",
+		Long: `Squashes multiple migration files into a single optimized migration.
+Redundant operations (like CREATE TABLE followed by DROP TABLE) are removed.
+Original migrations are backed up to migrations/.squashed_backup/`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			from, _ := cmd.Flags().GetString("from")
+			to, _ := cmd.Flags().GetString("to")
+			keepOriginals, _ := cmd.Flags().GetBool("keep-originals")
+			return cli.MigrateSquash(args[0], from, to, keepOriginals)
+		},
+	}
+	squashCmd.Flags().String("from", "", "Start from this migration ID (inclusive)")
+	squashCmd.Flags().String("to", "", "End at this migration ID (inclusive)")
+	squashCmd.Flags().Bool("keep-originals", false, "Keep original migration files (don't move to backup)")
+	cmd.AddCommand(squashCmd)
+
 	return cmd
 }
 

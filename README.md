@@ -118,6 +118,9 @@ nexus migrate new create_users
 # Auto-generate migration from schema changes (v0.4.0+)
 nexus migrate diff add_posts
 
+# Squash migrations into one (v0.4.0+)
+nexus migrate squash initial_schema
+
 # Apply migrations
 nexus migrate up
 

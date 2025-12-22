@@ -416,3 +416,121 @@ func MigrateDiff(name string) error {
 
 	return nil
 }
+
+// MigrateSquash combines multiple migrations into a single optimized migration.
+func MigrateSquash(name, fromID, toID string, keepOriginals bool) error {
+	// Load migrations from directory
+	files, err := os.ReadDir(migrationsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("no migrations directory found")
+		}
+		return fmt.Errorf("reading migrations: %w", err)
+	}
+
+	var migrations []*migration.Migration
+	for _, f := range files {
+		if f.IsDir() || !strings.HasSuffix(f.Name(), ".sql") {
+			continue
+		}
+
+		content, err := os.ReadFile(filepath.Join(migrationsDir, f.Name()))
+		if err != nil {
+			return fmt.Errorf("reading %s: %w", f.Name(), err)
+		}
+
+		m, err := parseMigrationFile(f.Name(), string(content))
+		if err != nil {
+			return fmt.Errorf("parsing %s: %w", f.Name(), err)
+		}
+
+		migrations = append(migrations, m)
+	}
+
+	if len(migrations) < 2 {
+		return fmt.Errorf("need at least 2 migrations to squash, found %d", len(migrations))
+	}
+
+	fmt.Printf("Found %d migrations\n", len(migrations))
+
+	// Squash migrations
+	opts := migration.SquashOptions{
+		FromID:     fromID,
+		ToID:       toID,
+		OutputName: name,
+	}
+
+	result, err := migration.SquashMigrations(migrations, opts)
+	if err != nil {
+		return fmt.Errorf("squashing migrations: %w", err)
+	}
+
+	fmt.Printf("\nSquash summary:\n")
+	fmt.Printf("  Original migrations: %d\n", result.OriginalCount)
+	fmt.Printf("  Statements after optimization: %d\n", result.OptimizedCount)
+	if result.RemovedCount > 0 {
+		fmt.Printf("  Redundant statements removed: %d\n", result.RemovedCount)
+	}
+
+	// Backup and/or delete original migrations
+	if !keepOriginals {
+		backupDir := filepath.Join(migrationsDir, ".squashed_backup")
+		if err := os.MkdirAll(backupDir, 0755); err != nil {
+			return fmt.Errorf("creating backup directory: %w", err)
+		}
+
+		for _, id := range result.OriginalIDs {
+			// Find and move the file
+			for _, f := range files {
+				if strings.HasPrefix(f.Name(), id) {
+					oldPath := filepath.Join(migrationsDir, f.Name())
+					newPath := filepath.Join(backupDir, f.Name())
+					if err := os.Rename(oldPath, newPath); err != nil {
+						return fmt.Errorf("backing up %s: %w", f.Name(), err)
+					}
+				}
+			}
+		}
+		fmt.Printf("\nOriginal migrations backed up to: %s/.squashed_backup/\n", migrationsDir)
+	}
+
+	// Save squashed migration
+	if err := migration.SaveMigration(migrationsDir, result.Migration); err != nil {
+		return fmt.Errorf("saving squashed migration: %w", err)
+	}
+
+	filename := fmt.Sprintf("%s_%s.sql", result.Migration.ID, result.Migration.Name)
+	fmt.Printf("✓ Created squashed migration: %s/%s\n", migrationsDir, filename)
+
+	return nil
+}
+
+// parseMigrationFile parses a migration file (local copy for CLI).
+func parseMigrationFile(filename, content string) (*migration.Migration, error) {
+	// Expected format: 20231221_123000_create_users.sql
+	parts := strings.SplitN(strings.TrimSuffix(filename, ".sql"), "_", 3)
+	if len(parts) < 3 {
+		return nil, fmt.Errorf("invalid migration filename format")
+	}
+
+	id := parts[0] + "_" + parts[1]
+	name := parts[2]
+
+	// Parse UP and DOWN sections
+	upSQL, downSQL := "", ""
+	sections := strings.Split(content, "-- DOWN")
+	if len(sections) >= 1 {
+		upPart := strings.TrimPrefix(sections[0], "-- UP")
+		upSQL = strings.TrimSpace(upPart)
+	}
+	if len(sections) >= 2 {
+		downSQL = strings.TrimSpace(sections[1])
+	}
+
+	return &migration.Migration{
+		ID:      id,
+		Name:    name,
+		UpSQL:   upSQL,
+		DownSQL: downSQL,
+	}, nil
+}
