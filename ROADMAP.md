@@ -61,7 +61,7 @@
 - [x] `nexus dev` - Watch mode with hot reload
 - [x] `nexus studio` - Database browser UI
 - [x] Better error messages with suggestions
-- [ ] Query plan analysis
+- [x] Query plan analysis
 - [ ] Performance profiler
 
 ---

@@ -205,3 +205,16 @@ func (d *Dialect) SupportsReturning() bool {
 func (d *Dialect) SupportsUpsert() bool {
 	return true
 }
+
+// ExplainSQL wraps query with EXPLAIN QUERY PLAN for SQLite.
+func (d *Dialect) ExplainSQL(query string, format string, analyze bool) string {
+	// SQLite uses EXPLAIN QUERY PLAN for query plans
+	// EXPLAIN gives bytecode which is less useful for optimization
+	return "EXPLAIN QUERY PLAN " + query
+}
+
+// SupportsExplainFormat returns supported formats for SQLite.
+func (d *Dialect) SupportsExplainFormat(format string) bool {
+	// SQLite only supports text format
+	return format == "text" || format == ""
+}

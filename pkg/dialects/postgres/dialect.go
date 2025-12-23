@@ -208,3 +208,27 @@ func (d *Dialect) SupportsReturning() bool {
 func (d *Dialect) SupportsUpsert() bool {
 	return true
 }
+
+// ExplainSQL wraps query with EXPLAIN for PostgreSQL.
+func (d *Dialect) ExplainSQL(query string, format string, analyze bool) string {
+	var opts []string
+	if analyze {
+		opts = append(opts, "ANALYZE true")
+	}
+	if format != "" && format != "text" {
+		opts = append(opts, "FORMAT "+format)
+	}
+	if len(opts) > 0 {
+		return "EXPLAIN (" + strings.Join(opts, ", ") + ") " + query
+	}
+	return "EXPLAIN " + query
+}
+
+// SupportsExplainFormat returns supported formats for PostgreSQL.
+func (d *Dialect) SupportsExplainFormat(format string) bool {
+	switch format {
+	case "", "text", "json", "xml", "yaml":
+		return true
+	}
+	return false
+}
