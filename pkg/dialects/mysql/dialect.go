@@ -207,3 +207,27 @@ func (d *Dialect) SupportsReturning() bool {
 func (d *Dialect) SupportsUpsert() bool {
 	return true
 }
+
+// ExplainSQL wraps query with EXPLAIN for MySQL.
+func (d *Dialect) ExplainSQL(query string, format string, analyze bool) string {
+	base := "EXPLAIN"
+	if analyze {
+		base = "EXPLAIN ANALYZE" // MySQL 8.0.18+
+	}
+	if format == "json" {
+		return base + " FORMAT=JSON " + query
+	}
+	if format == "tree" {
+		return base + " FORMAT=TREE " + query
+	}
+	return base + " " + query
+}
+
+// SupportsExplainFormat returns supported formats for MySQL.
+func (d *Dialect) SupportsExplainFormat(format string) bool {
+	switch format {
+	case "", "text", "json", "tree":
+		return true
+	}
+	return false
+}

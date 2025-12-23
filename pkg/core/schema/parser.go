@@ -346,5 +346,5 @@ func (p *Parser) formatErrors() error {
 		sb.WriteString("\n")
 	}
 
-	return fmt.Errorf(sb.String())
+	return fmt.Errorf("%s", sb.String())
 }

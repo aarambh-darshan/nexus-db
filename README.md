@@ -281,6 +281,33 @@ s.Model("User", func(m *schema.Model) {
 results, _ = users.Select().Include("Tag").All(ctx)  // Load users with their tags
 ```
 
+### v0.5.0 Features
+
+```go
+// Query Plan Analysis - understand and optimize your queries
+users := query.New(conn, "users")
+
+// Get query plan without executing
+plan, _ := users.Select("id", "email").
+    Where(query.Eq("email", "test@example.com")).
+    Explain(ctx)
+
+fmt.Println(plan.Raw)         // Raw EXPLAIN output
+fmt.Println(plan.UsedIndexes) // Indexes used (e.g., ["idx_users_email"])
+fmt.Println(plan.Warnings)    // Performance hints
+
+// Execute and get actual timings (EXPLAIN ANALYZE)
+plan, _ = users.Select().
+    Where(query.Like("name", "%John%")).
+    Analyze(ctx)
+
+// Custom explain options
+plan, _ = users.Select().Explain(ctx, query.ExplainOptions{
+    Analyze: true,               // Execute query
+    Format:  query.ExplainFormatJSON, // JSON output (PostgreSQL)
+})
+```
+
 ### Dialect Support
 
 | Feature | PostgreSQL | SQLite | MySQL |

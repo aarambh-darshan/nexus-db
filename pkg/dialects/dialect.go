@@ -52,6 +52,14 @@ type Dialect interface {
 
 	// SupportsUpsert returns true if upsert (ON CONFLICT) is supported.
 	SupportsUpsert() bool
+
+	// ExplainSQL wraps a query with EXPLAIN syntax.
+	// format: output format (json, text, etc.)
+	// analyze: if true, actually execute the query
+	ExplainSQL(query string, format string, analyze bool) string
+
+	// SupportsExplainFormat returns true if the given format is supported.
+	SupportsExplainFormat(format string) bool
 }
 
 // Connection represents a database connection with dialect awareness.
