@@ -15,6 +15,7 @@ type UpdateBuilder struct {
 	data       map[string]interface{}
 	conditions []Condition
 	returning  []string
+	profiler   *Profiler
 }
 
 // Where adds a WHERE condition.
@@ -82,7 +83,24 @@ func (u *UpdateBuilder) Build() (string, []interface{}) {
 // Exec executes the update and returns the number of affected rows.
 func (u *UpdateBuilder) Exec(ctx context.Context) (int64, error) {
 	query, args := u.Build()
+
+	// Start profiling if enabled
+	var profile *QueryProfile
+	if u.profiler != nil && u.profiler.IsEnabled() {
+		profile = u.profiler.StartQuery(query, args)
+	}
+
 	result, err := u.conn.Exec(ctx, query, args...)
+
+	// Record profiling data
+	if profile != nil {
+		if err == nil {
+			affected, _ := result.RowsAffected()
+			profile.RowsAffected = affected
+		}
+		u.profiler.EndQuery(profile, err)
+	}
+
 	if err != nil {
 		return 0, err
 	}

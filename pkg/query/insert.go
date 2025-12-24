@@ -16,6 +16,7 @@ type InsertBuilder struct {
 	returning  []string
 	onConflict *conflictClause
 	batchData  []map[string]interface{}
+	profiler   *Profiler
 }
 
 type conflictClause struct {
@@ -138,7 +139,24 @@ func (i *InsertBuilder) Build() (string, []interface{}) {
 // Exec executes the insert and returns the number of affected rows.
 func (i *InsertBuilder) Exec(ctx context.Context) (int64, error) {
 	query, args := i.Build()
+
+	// Start profiling if enabled
+	var profile *QueryProfile
+	if i.profiler != nil && i.profiler.IsEnabled() {
+		profile = i.profiler.StartQuery(query, args)
+	}
+
 	result, err := i.conn.Exec(ctx, query, args...)
+
+	// Record profiling data
+	if profile != nil {
+		if err == nil {
+			affected, _ := result.RowsAffected()
+			profile.RowsAffected = affected
+		}
+		i.profiler.EndQuery(profile, err)
+	}
+
 	if err != nil {
 		return 0, err
 	}
