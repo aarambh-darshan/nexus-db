@@ -23,6 +23,7 @@ type SelectBuilder struct {
 	having     []Condition
 	schema     *schema.Schema // Optional schema for relation-aware queries
 	includes   []string       // Relations to eager load
+	profiler   *Profiler      // Optional profiler for performance tracking
 }
 
 type joinClause struct {
@@ -175,15 +176,34 @@ func (s *SelectBuilder) Build() (string, []interface{}) {
 // All executes the query and returns all matching rows.
 func (s *SelectBuilder) All(ctx context.Context) (Results, error) {
 	query, args := s.Build()
+
+	// Start profiling if enabled
+	var profile *QueryProfile
+	if s.profiler != nil && s.profiler.IsEnabled() {
+		profile = s.profiler.StartQuery(query, args)
+	}
+
 	rows, err := s.conn.Query(ctx, query, args...)
 	if err != nil {
+		if profile != nil {
+			s.profiler.EndQuery(profile, err)
+		}
 		return nil, err
 	}
 	defer rows.Close()
 
 	results, err := scanRows(rows)
 	if err != nil {
+		if profile != nil {
+			s.profiler.EndQuery(profile, err)
+		}
 		return nil, err
+	}
+
+	// Record profiling data
+	if profile != nil {
+		profile.RowsReturned = len(results)
+		s.profiler.EndQuery(profile, nil)
 	}
 
 	// Eager load related data if includes are specified
@@ -266,9 +286,23 @@ func (s *SelectBuilder) Count(ctx context.Context) (int64, error) {
 		args = append(args, whereArgs...)
 	}
 
+	// Start profiling if enabled
+	var profile *QueryProfile
+	if s.profiler != nil && s.profiler.IsEnabled() {
+		profile = s.profiler.StartQuery(sql, args)
+	}
+
 	var count int64
 	row := s.conn.QueryRow(ctx, sql, args...)
-	if err := row.Scan(&count); err != nil {
+	err := row.Scan(&count)
+
+	// Record profiling data
+	if profile != nil {
+		profile.RowsReturned = 1
+		s.profiler.EndQuery(profile, err)
+	}
+
+	if err != nil {
 		return 0, err
 	}
 	return count, nil

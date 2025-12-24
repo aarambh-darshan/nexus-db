@@ -306,6 +306,27 @@ plan, _ = users.Select().Explain(ctx, query.ExplainOptions{
     Analyze: true,               // Execute query
     Format:  query.ExplainFormatJSON, // JSON output (PostgreSQL)
 })
+
+// Performance Profiler - track and analyze query performance
+profiler := query.NewProfiler(query.DefaultProfilerOptions())
+profiler.Start()
+
+// Attach profiler to builders
+users = query.New(conn, "users").WithProfiler(profiler)
+
+// Execute queries - they're automatically profiled
+users.Select("id", "email").All(ctx)
+users.Insert(map[string]any{"email": "test@example.com"}).Exec(ctx)
+
+// Get performance report
+profiler.Stop()
+report := profiler.Report()
+
+fmt.Println(report.String())          // Formatted text report
+fmt.Println(report.TotalQueries)      // Number of queries
+fmt.Println(report.SlowQueries)       // Queries exceeding threshold
+fmt.Println(report.NPlusOneWarnings)  // Detected N+1 patterns
+fmt.Println(report.Suggestions)       // Optimization tips
 ```
 
 ### Dialect Support

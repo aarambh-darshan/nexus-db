@@ -17,6 +17,7 @@ type DeleteBuilder struct {
 	returning  []string
 	schema     *schema.Schema
 	cascade    bool
+	profiler   *Profiler
 }
 
 // Where adds a WHERE condition.
@@ -84,7 +85,24 @@ func (d *DeleteBuilder) Exec(ctx context.Context) (int64, error) {
 	}
 
 	query, args := d.Build()
+
+	// Start profiling if enabled
+	var profile *QueryProfile
+	if d.profiler != nil && d.profiler.IsEnabled() {
+		profile = d.profiler.StartQuery(query, args)
+	}
+
 	result, err := d.conn.Exec(ctx, query, args...)
+
+	// Record profiling data
+	if profile != nil {
+		if err == nil {
+			affected, _ := result.RowsAffected()
+			profile.RowsAffected = affected
+		}
+		d.profiler.EndQuery(profile, err)
+	}
+
 	if err != nil {
 		return 0, err
 	}

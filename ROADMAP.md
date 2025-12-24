@@ -62,7 +62,7 @@
 - [x] `nexus studio` - Database browser UI
 - [x] Better error messages with suggestions
 - [x] Query plan analysis
-- [ ] Performance profiler
+- [x] Performance profiler
 
 ---
 

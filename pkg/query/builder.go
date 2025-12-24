@@ -16,6 +16,7 @@ type Builder struct {
 	conn      *dialects.Connection
 	tableName string
 	schema    *schema.Schema
+	profiler  *Profiler
 }
 
 // New creates a new query builder for the given table.
@@ -35,6 +36,13 @@ func NewWithSchema(conn *dialects.Connection, tableName string, sch *schema.Sche
 	}
 }
 
+// WithProfiler attaches a profiler to the builder for performance tracking.
+// All queries executed through this builder will be profiled.
+func (b *Builder) WithProfiler(p *Profiler) *Builder {
+	b.profiler = p
+	return b
+}
+
 // Select creates a SELECT query builder.
 func (b *Builder) Select(columns ...string) *SelectBuilder {
 	return &SelectBuilder{
@@ -42,6 +50,7 @@ func (b *Builder) Select(columns ...string) *SelectBuilder {
 		tableName: b.tableName,
 		columns:   columns,
 		schema:    b.schema,
+		profiler:  b.profiler,
 	}
 }
 
@@ -51,6 +60,7 @@ func (b *Builder) Insert(data map[string]interface{}) *InsertBuilder {
 		conn:      b.conn,
 		tableName: b.tableName,
 		data:      data,
+		profiler:  b.profiler,
 	}
 }
 
@@ -60,6 +70,7 @@ func (b *Builder) Update(data map[string]interface{}) *UpdateBuilder {
 		conn:      b.conn,
 		tableName: b.tableName,
 		data:      data,
+		profiler:  b.profiler,
 	}
 }
 
@@ -69,6 +80,7 @@ func (b *Builder) Delete() *DeleteBuilder {
 		conn:      b.conn,
 		tableName: b.tableName,
 		schema:    b.schema,
+		profiler:  b.profiler,
 	}
 }
 

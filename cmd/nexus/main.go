@@ -31,6 +31,7 @@ func main() {
 	rootCmd.AddCommand(genCmd())
 	rootCmd.AddCommand(devCmd())
 	rootCmd.AddCommand(studioCmd())
+	rootCmd.AddCommand(profileCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -309,6 +310,51 @@ Examples:
 	cmd.Flags().Int("port", 4000, "Port to run the studio server on")
 	cmd.Flags().String("host", "localhost", "Host to bind the server to")
 	cmd.Flags().Bool("no-open", false, "Don't automatically open browser")
+
+	return cmd
+}
+
+// profileCmd runs the performance profiler
+func profileCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "profile",
+		Short: "Run the performance profiler",
+		Long: `Starts a query profiling session to analyze database performance.
+
+The profiler captures query execution metrics, detects slow queries,
+identifies N+1 patterns, and provides optimization suggestions.
+
+Examples:
+  nexus profile                    # Run in demo mode with sample queries
+  nexus profile --duration 30s     # Profile for 30 seconds
+  nexus profile --slow 50ms        # Set slow query threshold to 50ms
+  nexus profile --json             # Output report as JSON`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			demo, _ := cmd.Flags().GetBool("demo")
+			if demo {
+				return cli.ProfileDemo()
+			}
+
+			opts := cli.DefaultProfileOptions()
+
+			duration, _ := cmd.Flags().GetDuration("duration")
+			slow, _ := cmd.Flags().GetDuration("slow")
+			jsonOutput, _ := cmd.Flags().GetBool("json")
+
+			opts.Duration = duration
+			opts.SlowThreshold = slow
+			if jsonOutput {
+				opts.OutputFormat = "json"
+			}
+
+			return cli.Profile(opts)
+		},
+	}
+
+	cmd.Flags().Bool("demo", true, "Run in demo mode with sample queries")
+	cmd.Flags().Duration("duration", 0, "Auto-stop profiling after this duration")
+	cmd.Flags().Duration("slow", 100*time.Millisecond, "Slow query threshold")
+	cmd.Flags().Bool("json", false, "Output report as JSON")
 
 	return cmd
 }
